@@ -24,20 +24,12 @@
             background: rgba(255, 255, 255, 0.7);
             border: none; border-radius: 50%;
             font-size: 24px; font-weight: bold;
-        }
-        .touchpad {
-            position: fixed; bottom: 20px; right: 20px;
-            width: 100px; height: 100px;
-            background: rgba(255, 255, 255, 0.5);
-            border-radius: 10px;
-            text-align: center; line-height: 100px;
-            font-size: 20px; font-weight: bold;
-            user-select: none;
+            touch-action: none;
         }
     </style>
 </head>
 <body>
-    <div id="info">Click to start. Arrow Keys to move, Up to jump, Left Click to place, Right Click to remove.</div>
+    <div id="info">Click to start. Arrow Keys to move, Up to jump, Click & drag to look.</div>
 
     <!-- Mobile Controls -->
     <div class="controls">
@@ -45,7 +37,6 @@
         <button class="btn" id="up-btn">↑</button>
         <button class="btn" id="right-btn">→</button>
     </div>
-    <div class="touchpad" id="touchpad">Look</div>
 
     <script>
         let scene, camera, renderer, controls;
@@ -53,6 +44,7 @@
         let blockSize = 1;
         let playerHeight = 2;
         let worldData = [];
+        let isDragging = false, prevX, prevY;
 
         function init() {
             scene = new THREE.Scene();
@@ -66,7 +58,11 @@
             document.body.appendChild(renderer.domElement);
 
             controls = new THREE.PointerLockControls(camera, document.body);
-            document.addEventListener("click", () => controls.lock());
+            document.addEventListener("click", (e) => {
+                if (!e.target.classList.contains("btn")) {
+                    controls.lock();
+                }
+            });
 
             scene.add(controls.getObject());
 
@@ -84,7 +80,7 @@
             document.addEventListener("keydown", onKeyDown);
             document.addEventListener("keyup", onKeyUp);
 
-            setupMobileControls();
+            setupTouchControls();
             animate();
         }
 
@@ -106,6 +102,8 @@
         }
 
         function onMouseDown(event) {
+            if (event.target.classList.contains("btn")) return; // Prevents block placement on button clicks
+
             let raycaster = new THREE.Raycaster();
             let mouse = new THREE.Vector2();
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -154,27 +152,33 @@
             renderer.render(scene, camera);
         }
 
-        function setupMobileControls() {
+        function setupTouchControls() {
             document.getElementById("left-btn").addEventListener("touchstart", () => moveLeft = true);
             document.getElementById("left-btn").addEventListener("touchend", () => moveLeft = false);
             document.getElementById("right-btn").addEventListener("touchstart", () => moveRight = true);
             document.getElementById("right-btn").addEventListener("touchend", () => moveRight = false);
             document.getElementById("up-btn").addEventListener("touchstart", () => controls.getObject().position.y += blockSize);
 
-            let touchpad = document.getElementById("touchpad");
-            let lastX, lastY;
-            touchpad.addEventListener("touchstart", (e) => {
-                lastX = e.touches[0].clientX;
-                lastY = e.touches[0].clientY;
+            document.addEventListener("touchstart", (e) => {
+                if (!e.target.classList.contains("btn")) {
+                    isDragging = true;
+                    prevX = e.touches[0].clientX;
+                    prevY = e.touches[0].clientY;
+                }
             });
-            touchpad.addEventListener("touchmove", (e) => {
-                let dx = e.touches[0].clientX - lastX;
-                let dy = e.touches[0].clientY - lastY;
-                camera.rotation.y -= dx * 0.005;
-                camera.rotation.x -= dy * 0.005;
-                lastX = e.touches[0].clientX;
-                lastY = e.touches[0].clientY;
+
+            document.addEventListener("touchmove", (e) => {
+                if (isDragging) {
+                    let dx = e.touches[0].clientX - prevX;
+                    let dy = e.touches[0].clientY - prevY;
+                    camera.rotation.y -= dx * 0.005;
+                    camera.rotation.x -= dy * 0.005;
+                    prevX = e.touches[0].clientX;
+                    prevY = e.touches[0].clientY;
+                }
             });
+
+            document.addEventListener("touchend", () => isDragging = false);
         }
 
         window.addEventListener("resize", () => {
