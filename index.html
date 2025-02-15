@@ -15,43 +15,54 @@
             color: white; background: rgba(0, 0, 0, 0.5);
             padding: 10px; border-radius: 5px;
         }
-        .controls {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            display: flex; gap: 10px;
+        .crosshair {
+            position: fixed; top: 50%; left: 50%;
+            width: 10px; height: 10px;
+            background: white; border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
         }
-        .btn {
-            width: 50px; height: 50px;
+        .joystick {
+            position: fixed; bottom: 20px; left: 20px;
+            width: 80px; height: 80px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            text-align: center; line-height: 80px;
+            font-size: 20px; font-weight: bold;
+            user-select: none;
+        }
+        .jump-btn {
+            position: fixed; bottom: 20px; right: 20px;
+            width: 60px; height: 60px;
             background: rgba(255, 255, 255, 0.7);
-            border: none; border-radius: 50%;
-            font-size: 24px; font-weight: bold;
-            touch-action: none;
+            border-radius: 50%;
+            text-align: center; line-height: 60px;
+            font-size: 20px; font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <div id="info">Click to start. Arrow Keys to move, Up to jump, Click & drag to look.</div>
+    <div id="info">Click to start. Arrow keys or joystick to move, Jump (↑ or button), Click & drag to look.</div>
+    <div class="crosshair"></div>
 
     <!-- Mobile Controls -->
-    <div class="controls">
-        <button class="btn" id="left-btn">←</button>
-        <button class="btn" id="up-btn">↑</button>
-        <button class="btn" id="right-btn">→</button>
-    </div>
+    <div class="joystick" id="joystick">☰</div>
+    <div class="jump-btn" id="jump-btn">↑</div>
 
     <script>
         let scene, camera, renderer, controls;
         let blocks = [];
         let blockSize = 1;
-        let playerHeight = 2;
         let worldData = [];
         let isDragging = false, prevX, prevY;
+        let moveLeft = false, moveRight = false, moveForward = false, moveBackward = false;
 
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x87CEEB);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, playerHeight, 0);
+            camera.position.set(0, 2, 0);
 
             renderer = new THREE.WebGLRenderer();
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -59,9 +70,7 @@
 
             controls = new THREE.PointerLockControls(camera, document.body);
             document.addEventListener("click", (e) => {
-                if (!e.target.classList.contains("btn")) {
-                    controls.lock();
-                }
+                if (!e.target.classList.contains("btn")) controls.lock();
             });
 
             scene.add(controls.getObject());
@@ -84,25 +93,30 @@
             animate();
         }
 
-        let moveLeft = false, moveRight = false, moveForward = false;
         function onKeyDown(event) {
             if (event.code === "ArrowLeft") moveLeft = true;
             if (event.code === "ArrowRight") moveRight = true;
-            if (event.code === "ArrowUp") controls.getObject().position.y += blockSize;
+            if (event.code === "ArrowUp") moveForward = true;
+            if (event.code === "ArrowDown") moveBackward = true;
         }
+
         function onKeyUp(event) {
             if (event.code === "ArrowLeft") moveLeft = false;
             if (event.code === "ArrowRight") moveRight = false;
+            if (event.code === "ArrowUp") moveForward = false;
+            if (event.code === "ArrowDown") moveBackward = false;
         }
 
         function updateMovement() {
             let speed = 0.1;
             if (moveLeft) controls.moveRight(-speed);
             if (moveRight) controls.moveRight(speed);
+            if (moveForward) controls.moveForward(speed);
+            if (moveBackward) controls.moveForward(-speed);
         }
 
         function onMouseDown(event) {
-            if (event.target.classList.contains("btn")) return; // Prevents block placement on button clicks
+            if (event.target.classList.contains("btn")) return;
 
             let raycaster = new THREE.Raycaster();
             let mouse = new THREE.Vector2();
@@ -153,32 +167,16 @@
         }
 
         function setupTouchControls() {
-            document.getElementById("left-btn").addEventListener("touchstart", () => moveLeft = true);
-            document.getElementById("left-btn").addEventListener("touchend", () => moveLeft = false);
-            document.getElementById("right-btn").addEventListener("touchstart", () => moveRight = true);
-            document.getElementById("right-btn").addEventListener("touchend", () => moveRight = false);
-            document.getElementById("up-btn").addEventListener("touchstart", () => controls.getObject().position.y += blockSize);
-
-            document.addEventListener("touchstart", (e) => {
-                if (!e.target.classList.contains("btn")) {
-                    isDragging = true;
-                    prevX = e.touches[0].clientX;
-                    prevY = e.touches[0].clientY;
-                }
-            });
+            document.getElementById("joystick").addEventListener("touchstart", () => moveForward = true);
+            document.getElementById("joystick").addEventListener("touchend", () => moveForward = false);
+            document.getElementById("jump-btn").addEventListener("touchstart", () => controls.getObject().position.y += blockSize);
 
             document.addEventListener("touchmove", (e) => {
-                if (isDragging) {
-                    let dx = e.touches[0].clientX - prevX;
-                    let dy = e.touches[0].clientY - prevY;
-                    camera.rotation.y -= dx * 0.005;
-                    camera.rotation.x -= dy * 0.005;
-                    prevX = e.touches[0].clientX;
-                    prevY = e.touches[0].clientY;
-                }
+                let dx = e.touches[0].clientX - window.innerWidth / 2;
+                let dy = e.touches[0].clientY - window.innerHeight / 2;
+                camera.rotation.y -= dx * 0.0005;
+                camera.rotation.x -= dy * 0.0005;
             });
-
-            document.addEventListener("touchend", () => isDragging = false);
         }
 
         window.addEventListener("resize", () => {
